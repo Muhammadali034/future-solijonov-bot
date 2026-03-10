@@ -140,7 +140,7 @@ def about(message):
     text = "Future Education o‘quv markazi.\nMatematika, Ingliz tili va Prezident maktabiga tayyorlov kurslari mavjud."
     bot.send_message(message.chat.id, text)
 
-if name == "main":
+if __name__ == "__main__":
     keep_alive() # Serverni alohida oqimda ishga tushirish
     print("Bot ishga tushdi...")
     bot.infinity_polling()
