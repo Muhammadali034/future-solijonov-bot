@@ -3,9 +3,27 @@ from telebot import types
 import sqlite3
 import re
 from datetime import datetime
-import os  # ← TOKENni xavfsiz olish uchun
+import os
+from flask import Flask
+from threading import Thread
 
-# Tokenni Environment Variable orqali olamiz
+# Render uchun kichik Web Server yaratamiz
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is running!"
+
+def run():
+    # Render avtomatik ravishda PORT beradi, bo'lmasa 8080 ishlatiladi
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+
+# Tokenni xavfsiz olish
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = 8080039848
 
@@ -24,7 +42,6 @@ subject TEXT,
 time TEXT
 )
 """)
-
 conn.commit()
 
 user_data = {}
@@ -52,6 +69,7 @@ def register(message):
     bot.register_next_step_handler(msg, get_name)
 
 def get_name(message):
+    # O'zbekcha harflarni ham qo'llab-quvvatlash uchun pattern
     pattern = r"^[A-Za-zʻʼ' ]+ \d+-sinf$"
     if not re.match(pattern, message.text):
         msg = bot.send_message(
@@ -88,44 +106,41 @@ def get_phone(message):
     bot.register_next_step_handler(msg, get_subject)
 
 def get_subject(message):
-    subject = message.text
-    data = user_data[message.chat.id]
-    time = datetime.now().strftime("%Y-%m-%d %H:%M")
-    cursor.execute(
-        "INSERT INTO students(name,phone,subject,time) VALUES(?,?,?,?)",
-        (data["name"], data["phone"], subject, time)
-    )
-    conn.commit()
-    admin_text = f"""
-🎓 Yangi o‘quvchi ro‘yxatdan o‘tdi
-
-👤 {data['name']}
-📞 {data['phone']}
-📚 {subject}
-🕒 {time}
-"""
-    bot.send_message(ADMIN_ID, admin_text)
-    bot.send_message(
-        message.chat.id,
-        "Bizni tanlaganingiz uchun rahmat!\nTez orada administratsiyamiz siz bilan bog‘lanadi."
-    )
+    try:
+        subject = message.text
+        data = user_data.get(message.chat.id)
+        if not data:
+            bot.send_message(message.chat.id, "Xatolik yuz berdi, qaytadan boshlang /start")
+            return
+            
+        time = datetime.now().strftime("%Y-%m-%d %H:%M")
+        cursor.execute(
+            "INSERT INTO students(name,phone,subject,time) VALUES(?,?,?,?)",
+            (data["name"], data["phone"], subject, time)
+        )
+        conn.commit()
+        
+        admin_text = f"🎓 Yangi o‘quvchi ro‘yxatdan o‘tdi\n\n👤 {data['name']}\n📞 {data['phone']}\n📚 {subject}\n🕒 {time}"
+        bot.send_message(ADMIN_ID, admin_text)
+        bot.send_message(
+            message.chat.id,
+            "Bizni tanlaganingiz uchun rahmat!\nTez orada administratsiyamiz siz bilan bog‘lanadi."
+        )
+    except Exception as e:
+        print(f"Xato: {e}")
 
 # BOGLANISH
 @bot.message_handler(func=lambda m: m.text == "Bogʻlanish")
 def contact(message):
-    text = (
-        "✈️ Telegram: @Future_admin3\n"
-        "📞 +998930570449"
-    )
-    bot.send_message(message.chat.id,text)
-
+    text = "✈️ Telegram: @Future_admin3\n📞 +998930570449"
+    bot.send_message(message.chat.id, text)
 # MARKAZ HAQIDA
 @bot.message_handler(func=lambda m: m.text == "Markaz haqida")
 def about(message):
-    text = (
-        "Future Education o‘quv markazi.\n"
-        "Matematika, Ingliz tili va Prezident maktabiga tayyorlov kurslari mavjud."
-    )
-    bot.send_message(message.chat.id,text)
+    text = "Future Education o‘quv markazi.\nMatematika, Ingliz tili va Prezident maktabiga tayyorlov kurslari mavjud."
+    bot.send_message(message.chat.id, text)
 
-bot.infinity_polling()
+if name == "main":
+    keep_alive() # Serverni alohida oqimda ishga tushirish
+    print("Bot ishga tushdi...")
+    bot.infinity_polling()
