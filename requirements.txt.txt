@@ -1,2 +1,4 @@
 pyTelegrambotAPI
 telebot
+flask
+gunicorn
